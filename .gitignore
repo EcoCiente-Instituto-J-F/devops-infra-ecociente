@@ -1,0 +1,58 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Terraform variables
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Terraform overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI
+.terraformrc
+terraform.rc
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Kubernetes secrets
+**/secret.yaml
+**/secrets.yaml
+
+# Cloud credentials
+credentials.json
+**/credentials.json
+service-account.json
+**/service-account.json
+gcp-credentials.json
+**/gcp-credentials.json
+aws-credentials
+**/aws-credentials
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE
+.idea/
+.vscode/
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
