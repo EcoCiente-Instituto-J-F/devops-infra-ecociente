@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ecociente
+  labels:
+    app.kubernetes.io/name: ecociente
+    app.kubernetes.io/part-of: ecociente
+    environment: aws-lab
