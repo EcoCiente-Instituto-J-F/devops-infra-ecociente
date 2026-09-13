@@ -1,0 +1,181 @@
+name: Deploy AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      application:
+        description: Aplicacao a ser implantada
+        required: true
+        type: choice
+        options:
+          - autenticacao
+
+      image_tag:
+        description: Tag da imagem Docker (opcional)
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy application
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    environment: aws-lab
+
+    permissions:
+      contents: read
+
+    env:
+      AWS_REGION: us-east-1
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+
+    steps:
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          APPLICATION: ${{ inputs.application }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$APPLICATION" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "Nome de aplicacao invalido."
+            exit 1
+          fi
+
+          if [ -n "$IMAGE_TAG" ] && \
+             ! [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Tag de imagem invalida."
+            exit 1
+          fi
+
+          if [ -z "$EC2_INSTANCE_ID" ]; then
+            echo "A variavel EC2_INSTANCE_ID nao foi configurada."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Validate AWS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity
+
+      - name: Validate EC2 state
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          STATE="$(aws ec2 describe-instances \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].State.Name" \
+            --output text)"
+
+          echo "EC2 state: $STATE"
+
+          if [ "$STATE" != "running" ]; then
+            echo "A instancia EC2 precisa estar running antes do deploy."
+            exit 1
+          fi
+
+      - name: Wait for SSM
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for ATTEMPT in {1..18}; do
+            STATUS="$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$EC2_INSTANCE_ID" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text)"
+
+            echo "SSM status: $STATUS"
+
+            if [ "$STATUS" = "Online" ]; then
+              exit 0
+            fi
+
+            echo "Aguardando SSM ficar Online..."
+            sleep 10
+          done
+
+          echo "A instancia nao ficou Online no SSM dentro do tempo esperado."
+          exit 1
+
+      - name: Deploy with Helm through SSM
+        id: deploy
+        shell: bash
+        env:
+          APPLICATION: ${{ inputs.application }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          REPOSITORY_URL="https://github.com/EcoCiente-Instituto-J-F/devops-infra-ecociente.git"
+          REPOSITORY_DIR="/home/ssm-user/devops-infra-ecociente"
+
+          REMOTE_COMMAND="sudo -u ssm-user bash -lc 'set -euo pipefail; \
+          REPOSITORY_DIR=\"${REPOSITORY_DIR}\"; \
+          if [ ! -d \"${REPOSITORY_DIR}/.git\" ]; then \
+            rm -rf \"${REPOSITORY_DIR}\"; \
+            git clone --branch main --single-branch \"${REPOSITORY_URL}\" \"${REPOSITORY_DIR}\"; \
+          fi; \
+          cd \"${REPOSITORY_DIR}\"; \
+          git fetch origin main; \
+          git checkout main; \
+          git reset --hard origin/main; \
+          ./scripts/deploy-app.sh \"${APPLICATION}\" \"${IMAGE_TAG}\"'"
+
+          PARAMETERS="$(jq -cn \
+            --arg command "$REMOTE_COMMAND" \
+            '{commands:[$command]}')"
+
+          COMMAND_ID="$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "EcoCiente Helm deployment" \
+            --parameters "$PARAMETERS" \
+            --query "Command.CommandId" \
+            --output text)"
+
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+          echo "SSM Command ID: $COMMAND_ID"
+
+      - name: Wait for deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws ssm wait command-executed \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "$EC2_INSTANCE_ID"
+
+      - name: Show deployment output
+        if: always() && steps.deploy.outputs.command_id != ''
+        shell: bash
+        run: |
+          aws ssm get-command-invocation \
+            --command-id "${{ steps.deploy.outputs.command_id }}" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --query '{
+              Status:Status,
+              Output:StandardOutputContent,
+              Error:StandardErrorContent
+            }'
