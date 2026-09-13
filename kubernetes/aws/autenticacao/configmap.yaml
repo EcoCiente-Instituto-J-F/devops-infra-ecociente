@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: autenticacao-config
+  namespace: ecociente
+  labels:
+    app: autenticacao-api
+    app.kubernetes.io/name: autenticacao-api
+    app.kubernetes.io/part-of: ecociente
+data:
+  JWT_EXPIRATION_MS: "300000"
