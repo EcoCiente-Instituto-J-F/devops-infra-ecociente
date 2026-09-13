@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ecociente-api
+description: Helm Chart reutilizavel para APIs do projeto EcoCiente
+type: application
+
+version: 0.1.0
+appVersion: "1.0.0"
