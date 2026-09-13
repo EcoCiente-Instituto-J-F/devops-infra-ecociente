@@ -1,0 +1,63 @@
+replicaCount: 1
+
+fullnameOverride: calendario-api
+
+image:
+  repository: ecociente/ecociente
+  tag: calendario-1.0.0
+  pullPolicy: IfNotPresent
+
+containerPort: 9800
+
+configMap:
+  enabled: true
+  nameOverride: calendario-config
+  data:
+    SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
+    SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
+
+secret:
+  existingSecret: calendario-secret
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 9800
+
+ingress:
+  enabled: false
+  className: traefik
+  host: ""
+  path: /
+  pathType: Prefix
+  annotations: {}
+
+probes:
+  startup:
+    enabled: true
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 30
+
+  readiness:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+  liveness:
+    enabled: true
+    periodSeconds: 20
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podLabels: {}
