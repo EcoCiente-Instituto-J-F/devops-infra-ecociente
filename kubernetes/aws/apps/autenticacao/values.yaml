@@ -1,0 +1,61 @@
+replicaCount: 1
+
+fullnameOverride: autenticacao-api
+
+image:
+  repository: ecociente/ecociente
+  tag: autenticacao-1.0.0
+  pullPolicy: IfNotPresent
+
+containerPort: 9801
+
+configMap:
+  enabled: true
+  nameOverride: autenticacao-config
+
+  data:
+    JWT_EXPIRATION_MS: "300000"
+
+secret:
+  existingSecret: autenticacao-secret
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 9801
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+  path: /
+  pathType: Prefix
+  annotations: {}
+
+probes:
+  startup:
+    enabled: true
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 30
+
+  readiness:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+  liveness:
+    enabled: true
+    periodSeconds: 20
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+  limits:
+    cpu: 500m
+    memory: 512Mi
