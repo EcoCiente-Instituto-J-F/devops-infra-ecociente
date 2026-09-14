@@ -25,10 +25,10 @@ service:
   port: 9800
 
 ingress:
-  enabled: false
+  enabled: true
   className: traefik
   host: ""
-  path: /
+  path: /api/v1/agendamentos
   pathType: Prefix
   annotations: {}
 
