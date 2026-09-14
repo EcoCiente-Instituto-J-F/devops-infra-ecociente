@@ -28,7 +28,7 @@ ingress:
   enabled: true
   className: traefik
   host: ""
-  path: /
+  path: /auth
   pathType: Prefix
   annotations: {}
 

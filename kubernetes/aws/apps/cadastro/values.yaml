@@ -28,10 +28,10 @@ service:
   port: 9090
 
 ingress:
-  enabled: false
+  enabled: true
   className: traefik
   host: ""
-  path: /
+  path: /api/cadastro
   pathType: Prefix
   annotations: {}
 

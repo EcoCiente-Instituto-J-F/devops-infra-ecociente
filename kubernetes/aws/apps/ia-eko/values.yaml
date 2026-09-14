@@ -55,10 +55,10 @@ service:
   port: 8000
 
 ingress:
-  enabled: false
+  enabled: true
   className: traefik
   host: ""
-  path: /
+  path: /api/v1
   pathType: Prefix
   annotations: {}
 
