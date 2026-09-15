@@ -30,10 +30,14 @@ service:
 ingress:
   enabled: true
   className: traefik
-  host: ""
+  host: "api.52.71.117.143.sslip.io"
   path: /api/cadastro
   pathType: Prefix
   annotations: {}
+
+  tls:
+    enabled: true
+    secretName: ecociente-api-tls
 
 probes:
   startup:
