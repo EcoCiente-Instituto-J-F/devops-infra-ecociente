@@ -203,9 +203,9 @@ wait_for_platform
 echo
 echo "[2/7] Sincronizando repositorio..."
 
-git fetch origin main
-git checkout main
-git reset --hard origin/main
+sudo -u ssm-user -H git -C "${REPOSITORY_DIR}" fetch origin main
+sudo -u ssm-user -H git -C "${REPOSITORY_DIR}" checkout main
+sudo -u ssm-user -H git -C "${REPOSITORY_DIR}" reset --hard origin/main
 
 if [ ! -f "${VALUES_FILE}" ]; then
     echo "Erro: values.yaml nao encontrado apos sincronizacao:"
