@@ -31,6 +31,10 @@ ingress:
   pathType: Prefix
   annotations: {}
 
+  tls:
+    enabled: false
+    secretName: ""
+
 probes:
   startup:
     enabled: true
