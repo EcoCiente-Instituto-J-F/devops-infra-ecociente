@@ -19,8 +19,8 @@ output "ec2_instance_id" {
 }
 
 output "ec2_public_ip" {
-  description = "IPv4 publico atual da instancia."
-  value       = aws_instance.k3s_server.public_ip
+  description = "IPv4 publico estatico da instancia."
+  value       = aws_eip.k3s.public_ip
 }
 
 output "ec2_private_ip" {
