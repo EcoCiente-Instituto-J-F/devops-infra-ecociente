@@ -19,6 +19,12 @@ resource "aws_instance" "k3s_server" {
     http_tokens   = "required"
   }
 
+  lifecycle {
+    ignore_changes = [
+      ami
+    ]
+  }
+
   tags = {
     Name = var.instance_name
     Role = "k3s-server"
