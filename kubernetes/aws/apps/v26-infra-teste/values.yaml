@@ -62,4 +62,5 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-podLabels: {}
+podLabels:
+  devops-test: "v27-auto-deploy"
