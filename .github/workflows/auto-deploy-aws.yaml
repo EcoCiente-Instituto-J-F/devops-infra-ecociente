@@ -1,0 +1,124 @@
+name: Auto Deploy AWS
+
+on:
+  push:
+    branches:
+      - main
+
+    paths:
+      - "kubernetes/aws/apps/*/values.yaml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  detect-and-dispatch:
+    name: Detectar aplicações alteradas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar aplicações alteradas
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          echo "Commit anterior: $BEFORE"
+          echo "Commit atual:    $AFTER"
+
+          changed_files="$(
+            git diff \
+              --name-only \
+              --diff-filter=ACMR \
+              "$BEFORE" \
+              "$AFTER" \
+              -- \
+              'kubernetes/aws/apps/*/values.yaml'
+          )"
+
+          if [ -z "$changed_files" ]; then
+            echo "Nenhum values.yaml de aplicação foi alterado."
+            echo "applications=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Arquivos detectados:"
+          printf '%s\n' "$changed_files"
+
+          applications="$(
+            printf '%s\n' "$changed_files" |
+              awk -F/ '
+                NF == 5 &&
+                $1 == "kubernetes" &&
+                $2 == "aws" &&
+                $3 == "apps" &&
+                $5 == "values.yaml" {
+                  print $4
+                }
+              ' |
+              sort -u
+          )"
+
+          if [ -z "$applications" ]; then
+            echo "Nenhuma aplicação válida foi encontrada."
+            echo "applications=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo ""
+          echo "Aplicações detectadas:"
+          printf '%s\n' "$applications"
+
+          {
+            echo "applications<<EOF"
+            printf '%s\n' "$applications"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Acionar deploy das aplicações alteradas
+        if: steps.detect.outputs.applications != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATIONS: ${{ steps.detect.outputs.applications }}
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r application; do
+            if [ -z "$application" ]; then
+              continue
+            fi
+
+            if [[ ! "$application" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+              echo "::error::Nome de aplicação inválido: $application"
+              exit 1
+            fi
+
+            values_path="kubernetes/aws/apps/${application}/values.yaml"
+
+            if [ ! -f "$values_path" ]; then
+              echo "::error::Arquivo não encontrado: $values_path"
+              exit 1
+            fi
+
+            echo ""
+            echo "=========================================="
+            echo "Disparando deploy: $application"
+            echo "=========================================="
+
+            gh workflow run deploy-aws.yaml \
+              --repo "${{ github.repository }}" \
+              --ref main \
+              -f application="$application"
+
+            echo "Deploy solicitado com sucesso: $application"
+          done <<< "$APPLICATIONS"
