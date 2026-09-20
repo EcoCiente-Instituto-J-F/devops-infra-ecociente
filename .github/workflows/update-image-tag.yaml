@@ -67,53 +67,65 @@ jobs:
             exit 1
           fi
 
-          REPOSITORY="$(
-            awk '
-              /^image:[[:space:]]*$/ {
-                in_image = 1
-                next
-              }
+          IMAGE_METADATA="$(
+            python3 - "$VALUES_PATH" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
 
-              in_image && /^[^[:space:]]/ {
-                exit
-              }
+          path = Path(sys.argv[1])
 
-              in_image &&
-              /^[[:space:]]+repository:[[:space:]]*/ {
-                sub(
-                  /^[[:space:]]+repository:[[:space:]]*/,
-                  ""
-                )
+          repository = None
+          tag = None
+          in_image = False
 
-                print
-                exit
-              }
-            ' "$VALUES_PATH"
+          for line in path.read_text(encoding="utf-8").splitlines():
+              if re.fullmatch(r"image:\s*", line):
+                  in_image = True
+                  continue
+
+              if (
+                  in_image
+                  and line.strip()
+                  and not line[0].isspace()
+              ):
+                  break
+
+              if not in_image:
+                  continue
+
+              match = re.match(
+                  r"^\s+repository:\s*(\S+)\s*$",
+                  line,
+              )
+
+              if match:
+                  repository = match.group(1).strip("'\"")
+                  continue
+
+              match = re.match(
+                  r"^\s+tag:\s*(\S+)\s*$",
+                  line,
+              )
+
+              if match:
+                  tag = match.group(1).strip("'\"")
+
+          if not repository:
+              raise SystemExit(
+                  "Nao foi possivel localizar image.repository"
+              )
+
+          if not tag:
+              raise SystemExit(
+                  "Nao foi possivel localizar image.tag"
+              )
+
+          print(f"{repository}\t{tag}")
+          PY
           )"
 
-          CURRENT_TAG="$(
-            awk '
-              /^image:[[:space:]]*$/ {
-                in_image = 1
-                next
-              }
-
-              in_image && /^[^[:space:]]/ {
-                exit
-              }
-
-              in_image &&
-              /^[[:space:]]+tag:[[:space:]]*/ {
-                sub(
-                  /^[[:space:]]+tag:[[:space:]]*/,
-                  ""
-                )
-
-                print
-                exit
-              }
-            ' "$VALUES_PATH"
-          )"
+          IFS=$'\t' read -r REPOSITORY CURRENT_TAG <<< "$IMAGE_METADATA"
 
           if [ "$REPOSITORY" != "ecociente/ecociente" ]; then
             echo "::error::Repositorio Docker inesperado: $REPOSITORY"
