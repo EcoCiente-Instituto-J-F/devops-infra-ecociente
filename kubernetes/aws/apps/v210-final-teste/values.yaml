@@ -4,7 +4,7 @@ fullnameOverride: v210-final-teste-api
 
 image:
   repository: ecociente/ecociente
-  tag: v210-final-teste-1.0.0
+  tag: v210-final-teste-1.0.1
   pullPolicy: IfNotPresent
 
 containerPort: 8080
