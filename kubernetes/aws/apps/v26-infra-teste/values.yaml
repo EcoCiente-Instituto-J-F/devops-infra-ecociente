@@ -4,7 +4,7 @@ fullnameOverride: v26-infra-teste-api
 
 image:
   repository: ecociente/ecociente
-  tag: v26-infra-teste-1.0.0
+  tag: v26-infra-teste-1.0.1
   pullPolicy: IfNotPresent
 
 containerPort: 8080
