@@ -16,6 +16,7 @@ on:
           - v210-final-teste
           - pontuacao
           - esqueceusenha
+          - notificacoes
 
       image_tag:
         description: Tag da imagem Docker (opcional)
