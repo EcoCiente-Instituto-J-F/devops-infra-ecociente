@@ -12,8 +12,6 @@ on:
           - cadastro
           - calendario
           - ia-eko
-          - v26-infra-teste
-          - v210-final-teste
           - pontuacao
           - esqueceusenha
           - notificacoes
