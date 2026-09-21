@@ -4,7 +4,7 @@ fullnameOverride: esqueceusenha-api
 
 image:
   repository: ecociente/ecociente
-  tag: esqueceusenha-1.0.0
+  tag: esqueceusenha-1.0.1
   pullPolicy: IfNotPresent
 
 containerPort: 8080
