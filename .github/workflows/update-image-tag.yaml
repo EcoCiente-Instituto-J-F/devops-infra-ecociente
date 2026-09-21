@@ -1,0 +1,461 @@
+name: Update Image Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      application:
+        description: Nome curto da aplicacao
+        required: true
+        type: string
+
+      version:
+        description: Nova versao MAJOR.MINOR.PATCH
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-image-tag-${{ inputs.application }}
+  cancel-in-progress: false
+
+jobs:
+  update-image:
+
+    name: Atualizar imagem da aplicacao
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    steps:
+
+      - name: Checkout da infraestrutura
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validar atualizacao
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec 3>>"$GITHUB_OUTPUT"
+
+          APPLICATION="${{ inputs.application }}"
+          VERSION="${{ inputs.version }}"
+
+          if [[ ! "$APPLICATION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "::error::Nome de aplicacao invalido: $APPLICATION"
+            exit 1
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error::Versao invalida: $VERSION"
+            echo "::error::Use MAJOR.MINOR.PATCH, por exemplo 1.0.1."
+            exit 1
+          fi
+
+          VALUES_PATH="kubernetes/aws/apps/${APPLICATION}/values.yaml"
+          EXPECTED_TAG="${APPLICATION}-${VERSION}"
+
+          if [ ! -f "$VALUES_PATH" ]; then
+            echo "::error::Aplicacao nao registrada na infraestrutura: $APPLICATION"
+            echo "::error::Arquivo esperado: $VALUES_PATH"
+            exit 1
+          fi
+
+          IMAGE_METADATA="$(
+            python3 - "$VALUES_PATH" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+
+          repository = None
+          tag = None
+          in_image = False
+
+          for line in path.read_text(encoding="utf-8").splitlines():
+              if re.fullmatch(r"image:\s*", line):
+                  in_image = True
+                  continue
+
+              if (
+                  in_image
+                  and line.strip()
+                  and not line[0].isspace()
+              ):
+                  break
+
+              if not in_image:
+                  continue
+
+              match = re.match(
+                  r"^\s+repository:\s*(\S+)\s*$",
+                  line,
+              )
+
+              if match:
+                  repository = match.group(1).strip("'\"")
+                  continue
+
+              match = re.match(
+                  r"^\s+tag:\s*(\S+)\s*$",
+                  line,
+              )
+
+              if match:
+                  tag = match.group(1).strip("'\"")
+
+          if not repository:
+              raise SystemExit(
+                  "Nao foi possivel localizar image.repository"
+              )
+
+          if not tag:
+              raise SystemExit(
+                  "Nao foi possivel localizar image.tag"
+              )
+
+          print(f"{repository}\t{tag}")
+          PY
+          )"
+
+          IFS=$'\t' read -r REPOSITORY CURRENT_TAG <<< "$IMAGE_METADATA"
+
+          if [ "$REPOSITORY" != "ecociente/ecociente" ]; then
+            echo "::error::Repositorio Docker inesperado: $REPOSITORY"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT_TAG" ]; then
+            echo "::error::Nao foi possivel localizar image.tag em $VALUES_PATH"
+            exit 1
+          fi
+
+          if [[ ! "$CURRENT_TAG" =~ ^${APPLICATION}-[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error::Tag atual nao pertence a aplicacao $APPLICATION: $CURRENT_TAG"
+            exit 1
+          fi
+
+          echo "Aplicacao:       $APPLICATION"
+          echo "Versao alvo:     $VERSION"
+          echo "Values:          $VALUES_PATH"
+          echo "Tag atual:       $CURRENT_TAG"
+          echo "Tag desejada:    $EXPECTED_TAG"
+
+          if [ "$CURRENT_TAG" = "$EXPECTED_TAG" ]; then
+            echo ""
+            echo "A infraestrutura ja utiliza a tag solicitada."
+            echo "already_current=true" >&3
+          else
+            CURRENT_VERSION="${CURRENT_TAG#"$APPLICATION"-}"
+
+            python3 - \
+              "$CURRENT_VERSION" \
+              "$VERSION" <<'PY'
+          import sys
+
+          current = tuple(
+              int(part)
+              for part in sys.argv[1].split(".")
+          )
+
+          target = tuple(
+              int(part)
+              for part in sys.argv[2].split(".")
+          )
+
+          if target <= current:
+              raise SystemExit(
+                  "A atualizacao automatica aceita apenas "
+                  f"versoes superiores: atual={sys.argv[1]} "
+                  f"alvo={sys.argv[2]}"
+              )
+          PY
+
+            echo "already_current=false" >&3
+          fi
+
+          echo "application=$APPLICATION" >&3
+          echo "version=$VERSION" >&3
+          echo "values_path=$VALUES_PATH" >&3
+          echo "current_tag=$CURRENT_TAG" >&3
+          echo "expected_tag=$EXPECTED_TAG" >&3
+
+      - name: Verificar branch e PR existentes
+        id: existing
+        if: steps.validate.outputs.already_current != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION: ${{ steps.validate.outputs.application }}
+          VERSION: ${{ steps.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="bot/update-${APPLICATION}-${VERSION}"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote \
+            --exit-code \
+            --heads \
+            origin \
+            "refs/heads/$BRANCH" \
+            >/dev/null 2>&1
+          then
+            echo "Branch remota ja existe: $BRANCH"
+
+            PR_URL="$(
+              gh pr list \
+                --repo "${{ github.repository }}" \
+                --base main \
+                --head "$BRANCH" \
+                --state open \
+                --json url \
+                --jq '.[0].url // empty'
+            )"
+
+            if [ -n "$PR_URL" ]; then
+              echo "PR aberta ja existe:"
+              echo "$PR_URL"
+
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+              exit 0
+            fi
+
+            echo "::error::A branch $BRANCH existe, mas nao existe PR aberta associada."
+            echo "::error::Revisao manual necessaria para evitar sobrescrever trabalho existente."
+            exit 1
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Atualizar image.tag
+        if: >
+          steps.validate.outputs.already_current != 'true' &&
+          steps.existing.outputs.skip != 'true'
+        shell: bash
+        env:
+          VALUES_PATH: ${{ steps.validate.outputs.values_path }}
+          EXPECTED_TAG: ${{ steps.validate.outputs.expected_tag }}
+        run: |
+          set -euo pipefail
+
+          python3 - \
+            "$VALUES_PATH" \
+            "$EXPECTED_TAG" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          expected_tag = sys.argv[2]
+
+          text = path.read_text(
+              encoding="utf-8"
+          )
+
+          lines = text.splitlines(
+              keepends=True
+          )
+
+          in_image = False
+          replacements = 0
+
+          for index, line in enumerate(lines):
+
+              if line.strip() == "image:" and not line.startswith((" ", "\t")):
+                  in_image = True
+                  continue
+
+              if (
+                  in_image
+                  and line.strip()
+                  and not line.startswith((" ", "\t"))
+              ):
+                  in_image = False
+
+              if not in_image:
+                  continue
+
+              match = re.match(
+                  r"^([ \t]+)tag:[ \t]*\S+[ \t]*(\r?\n)?$",
+                  line,
+              )
+
+              if not match:
+                  continue
+
+              indent = match.group(1)
+              newline = match.group(2) or ""
+
+              lines[index] = (
+                  f"{indent}tag: {expected_tag}"
+                  f"{newline}"
+              )
+
+              replacements += 1
+
+          if replacements != 1:
+              raise SystemExit(
+                  "Era esperado alterar exatamente "
+                  f"1 image.tag, mas foram encontrados "
+                  f"{replacements}."
+              )
+
+          path.write_text(
+              "".join(lines),
+              encoding="utf-8",
+          )
+          PY
+
+          echo ""
+          echo "Diff gerado:"
+          git diff -- "$VALUES_PATH"
+
+          git diff --check
+
+          if git diff --quiet -- "$VALUES_PATH"; then
+            echo "::error::Nenhuma alteracao foi gerada em $VALUES_PATH"
+            exit 1
+          fi
+
+      - name: Criar branch e commit
+        if: >
+          steps.validate.outputs.already_current != 'true' &&
+          steps.existing.outputs.skip != 'true'
+        id: commit
+        shell: bash
+        env:
+          APPLICATION: ${{ steps.validate.outputs.application }}
+          VERSION: ${{ steps.validate.outputs.version }}
+          VALUES_PATH: ${{ steps.validate.outputs.values_path }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          git config \
+            user.name \
+            "github-actions[bot]"
+
+          git config \
+            user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout \
+            -b \
+            "$BRANCH"
+
+          git add \
+            "$VALUES_PATH"
+
+          git commit \
+            -m \
+            "chore: atualiza imagem de ${APPLICATION} para ${VERSION}"
+
+          git push \
+            origin \
+            "$BRANCH"
+
+      - name: Criar Pull Request
+        if: >
+          steps.validate.outputs.already_current != 'true' &&
+          steps.existing.outputs.skip != 'true'
+        id: pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPLICATION: ${{ steps.validate.outputs.application }}
+          VERSION: ${{ steps.validate.outputs.version }}
+          CURRENT_TAG: ${{ steps.validate.outputs.current_tag }}
+          EXPECTED_TAG: ${{ steps.validate.outputs.expected_tag }}
+          VALUES_PATH: ${{ steps.validate.outputs.values_path }}
+          BRANCH: ${{ steps.existing.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/pr-body.md <<EOF
+          ## Atualizacao automatica de imagem
+
+          Nova imagem publicada para a aplicacao \`$APPLICATION\`.
+
+          ### Alteracao
+
+          \`\`\`text
+          $CURRENT_TAG
+                  ?
+          $EXPECTED_TAG
+          \`\`\`
+
+          Arquivo alterado:
+
+          \`$VALUES_PATH\`
+
+          ### Fluxo
+
+          Esta PR foi criada automaticamente, mas o deploy continua dependendo de aprovacao humana.
+
+          Depois do merge:
+
+          \`\`\`text
+          merge
+            ?
+          Auto Deploy AWS
+            ?
+          Deploy AWS
+            ?
+          SSM
+            ?
+          Helm / k3s
+          \`\`\`
+
+          Nenhum secret, porta, Ingress ou recurso da aplicacao foi alterado.
+          EOF
+
+          PR_URL="$(
+            gh pr create \
+              --repo "${{ github.repository }}" \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: atualiza ${APPLICATION} para ${VERSION}" \
+              --body-file /tmp/pr-body.md
+          )"
+
+          echo ""
+          echo "Pull Request criada:"
+          echo "$PR_URL"
+
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Resumo
+        shell: bash
+        env:
+          APPLICATION: ${{ steps.validate.outputs.application }}
+          VERSION: ${{ steps.validate.outputs.version }}
+          ALREADY_CURRENT: ${{ steps.validate.outputs.already_current }}
+          EXISTING_PR: ${{ steps.existing.outputs.pr_url }}
+          CREATED_PR: ${{ steps.pr.outputs.url }}
+        run: |
+          echo "=========================================="
+          echo "Update Image Tag"
+          echo "=========================================="
+          echo "Aplicacao: $APPLICATION"
+          echo "Versao:    $VERSION"
+
+          if [ "$ALREADY_CURRENT" = "true" ]; then
+            echo "Resultado: infraestrutura ja atualizada."
+          elif [ -n "$EXISTING_PR" ]; then
+            echo "Resultado: PR ja existente."
+            echo "$EXISTING_PR"
+          else
+            echo "Resultado: nova PR criada."
+            echo "$CREATED_PR"
+          fi
