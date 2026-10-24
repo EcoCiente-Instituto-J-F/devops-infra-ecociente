@@ -15,6 +15,7 @@ on:
           - pontuacao
           - esqueceusenha
           - notificacoes
+          - mobile
           - dad
 
       image_tag:
