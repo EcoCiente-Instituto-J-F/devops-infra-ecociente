@@ -1,0 +1,62 @@
+
+name: Diagnostico AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: aws-lab
+
+    env:
+      AWS_REGION: us-east-1
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+
+    steps:
+      - name: Validar configuracao
+        shell: bash
+        run: |
+          test -n "$EC2_INSTANCE_ID" || {
+            echo "EC2_INSTANCE_ID nao configurado"
+            exit 1
+          }
+
+      - name: Autenticar na AWS
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Validar identidade e infraestrutura
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          aws sts get-caller-identity \
+            --query Account --output text >/dev/null
+
+          STATE="$(aws ec2 describe-instances \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)"
+
+          SSM="$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$EC2_INSTANCE_ID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text)"
+
+          echo "EC2: $STATE"
+          echo "SSM: $SSM"
+
+          test "$STATE" = "running"
+          test "$SSM" = "Online"
+
+          echo "AWS validada com sucesso."
