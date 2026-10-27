@@ -4,7 +4,7 @@ fullnameOverride: autenticacao-api
 
 image:
   repository: ecociente/ecociente
-  tag: autenticacao-1.0.0
+  tag: autenticacao-1.0.1
   pullPolicy: IfNotPresent
 
 containerPort: 9801
