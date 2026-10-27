@@ -12,10 +12,16 @@ containerPort: 8080
 configMap:
   enabled: true
   nameOverride: mobile-config
-  data: {}
+  data:
+    SERVER_PORT: "8080"
+    SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
+    SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
+    SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT: "10000"
 
 secret:
-  existingSecret: ""
+  # Provisionar no Kubernetes antes do merge; nao versionar os valores.
+  # Chaves: DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET.
+  existingSecret: mobile-secret
 
 service:
   enabled: true
