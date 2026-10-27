@@ -231,6 +231,12 @@ HELM_ARGS=(
     --timeout 5m
 )
 
+if [ "${APP_NAME}" = "autenticacao" ]; then
+    HELM_ARGS+=(
+        --server-side=false
+    )
+fi
+
 if [ -n "${IMAGE_TAG}" ]; then
     HELM_ARGS+=(
         --set-string "image.tag=${IMAGE_TAG}"
