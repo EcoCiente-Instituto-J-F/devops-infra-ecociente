@@ -20,7 +20,7 @@ configMap:
     SPRING_DATASOURCE_HIKARI_MAXLIFETIME: "600000"
 
 secret:
-  existingSecret: cadastro-secret
+  existingSecret: cadastro-neon-secret
 
 service:
   enabled: true
