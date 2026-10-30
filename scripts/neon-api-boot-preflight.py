@@ -166,40 +166,98 @@ def wait_until_ready(name):
 
 def safe_log_checks(name):
     result = call(K + [
-        "logs", "pod/" + name, "-n", NS, "--tail=600"
+        "logs", "pod/" + name, "-n", NS, "--tail=1200"
     ], timeout=30)
     if result is None or result.returncode != 0:
-        return "NAO DISPONIVEL", "INDETERMINADO", "NAO CONFIRMADO"
+        return ("NAO DISPONIVEL", "INDETERMINADO",
+                "NAO CONFIRMADO", "LOG_NAO_DISPONIVEL")
     logs = result.stdout
     jpa = bool(re.search(
-        r"(Initialized JPA EntityManagerFactory|"
-        r"Initialized JPA EntityManagerFactory for persistence unit)",
+        r"Initialized JPA EntityManagerFactory",
         logs, re.IGNORECASE))
     pool = bool(re.search(
-        r"HikariPool-\d+.*Start completed", logs, re.IGNORECASE))
+        r"HikariPool-\\d+.*Start completed", logs, re.IGNORECASE))
     spring = bool(re.search(
         r"Started [A-Za-z][A-Za-z0-9]*Application in ",
         logs, re.IGNORECASE))
-    causes = [
-        ("SCHEMA", r"Schema-validation:|missing table|wrong column type"),
-        ("AUTENTICACAO_DB", r"password authentication failed|SQLState: 28P01"),
-        ("SEM_CONEXAO_DB", r"too many clients|remaining connection slots|"
-         r"Connection is not available|Connection refused|"
+
+    markers = [
+        ("SCHEMA_VALIDATION", r"Schema-validation:|SchemaManagementException|"
+         r"missing table|wrong column type|missing column"),
+        ("SQL_OBJECT_MISSING", r"relation .* does not exist|"
+         r"column .* does not exist|SQLState: 42P01|SQLState: 42703"),
+        ("READ_ONLY_TX", r"read-only transaction|read only transaction|"
+         r"SQLState: 25006|readOnly.*is not supported"),
+        ("PERMISSAO_DB", r"permission denied|SQLState: 42501"),
+        ("LOGIN_POSTGRES", r"password authentication failed|SQLState: 28P01"),
+        ("POOL_CONEXOES", r"too many clients|remaining connection slots|"
+         r"Connection is not available|HikariPool.*timeout"),
+        ("REDE_POSTGRES", r"Connection refused|"
+         r"connect timed out|UnknownHostException|"
          r"Failed to obtain JDBC Connection|Unable to open JDBC Connection"),
-        ("CONFIGURACAO", r"Failed to configure a DataSource|"
-         r"Could not resolve placeholder"),
+        ("BINDING_CONFIG", r"Failed to bind properties under|"
+         r"ConfigurationPropertiesBindException|"
+         r"NotWritablePropertyException|Failed to configure a DataSource"),
+        ("JDBC_URL", r"No suitable driver|invalid JDBC URL|"
+         r"Driver .* claims to not accept jdbcUrl"),
+        ("CONFIGURACAO", r"Could not resolve placeholder|"
+         r"UnsatisfiedDependencyException"),
         ("JAVA_MEMORIA", r"OutOfMemoryError|Java heap space"),
         ("INICIALIZACAO", r"Application run failed|"
          r"APPLICATION FAILED TO START"),
     ]
-    issues = [title for title, pattern in causes
+    issues = [title for title, pattern in markers
               if re.search(pattern, logs, re.IGNORECASE)]
     app = "SIM" if spring else "NAO CONFIRMADO"
     db = "SIM" if (jpa and pool) else (
         "PARCIAL" if (jpa or pool) else "NAO CONFIRMADO"
     )
     issue = ",".join(issues) if issues else "NENHUM IDENTIFICADO"
-    return app, issue, db
+
+    # NUNCA imprimir mensagens de exception ou linhas de log:
+    # elas podem incluir URLs JDBC e credenciais.
+    exception_classes = re.findall(
+        r"Caused by:\\s+([a-zA-Z_$][\\w.$]*(?:Exception|Error))",
+        logs
+    )
+    exceptions = []
+    for cls in exception_classes:
+        simple = cls.rsplit(".", 1)[-1]
+        if simple not in exceptions:
+            exceptions.append(simple)
+    sqlstates = re.findall(
+        r"(?:SQLState|SQLSTATE)\\s*[:=]\\s*([0-9A-Z]{5})",
+        logs, flags=re.IGNORECASE
+    )
+    state_list = list(dict.fromkeys(sqlstates))
+    config_hits = []
+    for token in ("read-only", "maximum-pool-size", "minimum-idle",
+                  "connection-timeout", "entityManagerFactory",
+                  "ddl-auto", "hikari", "database"):
+        if token.lower() in logs.lower():
+            config_hits.append(token.upper().replace("-", "_"))
+    detail = (
+        "EXCEPTIONS=" + (",".join(exceptions[-7:]) or "NAO_IDENTIFICADAS")
+        + " SQLSTATE=" + (",".join(state_list[:4]) or "NAO_IDENTIFICADO")
+        + " CONTEXTO=" + (",".join(config_hits[:8]) or "NAO_IDENTIFICADO")
+        + " LINHAS=" + str(len(logs.splitlines()))
+    )
+    return app, issue, db, detail
+
+
+def exit_info(name):
+    pod = kubectl_json(["get", "pod", name, "-n", NS, "-o", "json"])
+    if not pod:
+        return "SEM_STATUS"
+    for cs in pod.get("status", {}).get("containerStatuses", []):
+        terminated = cs.get("state", {}).get("terminated")
+        if terminated:
+            reason = terminated.get("reason", "UNKNOWN")
+            code = terminated.get("exitCode", "?")
+            if reason not in ("Completed", "Error", "OOMKilled"):
+                reason = "OUTRO"
+            return "EXIT_%s_%s" % (code, reason)
+    return "AINDA_EXECUTANDO"
 
 
 def check_http_docs(name, port, path):
@@ -304,7 +362,7 @@ def main():
             print("Pod temporario criado. Validando inicializacao...",
                   flush=True)
             ready, reason = wait_until_ready(name)
-            app_start, issue, db = safe_log_checks(name)
+            app_start, issue, db, detail = safe_log_checks(name)
             http = check_http_docs(name, port, path) if ready else "NAO_TESTADO"
             ok = ready and http == "HTTP_200" and db == "SIM" and issue == "NENHUM IDENTIFICADO"
             results[app] = ok
@@ -315,6 +373,10 @@ def main():
                    "READY" if ready else reason, http, app_start, db, issue),
                 flush=True
             )
+            if not ok:
+                print("DIAGNOSTICO %s: %s | %s" % (
+                    app, exit_info(name), detail
+                ), flush=True)
         except (ValueError, TypeError, KeyError, RuntimeError) as error:
             results[app] = False
             print("RESULTADO %s: REVISAR (%s)" % (app, str(error)),
