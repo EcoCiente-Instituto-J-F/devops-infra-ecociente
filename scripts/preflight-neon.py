@@ -159,7 +159,7 @@ run_db() {
   senha="$4"
   case "$jdbc" in
     jdbc:postgresql://*) ;;
-    *) printf 'DB_FAIL:%s\n' "$label"; return ;;
+    *) printf 'DB_FAIL:%s:INVALID_JDBC_URL\n' "$label"; return ;;
   esac
   uri="${jdbc#jdbc:postgresql://}"
   hostport="${uri%%/*}"
@@ -171,7 +171,7 @@ run_db() {
   export PGHOST="$host" PGPORT="$port" PGDATABASE="$db"
   export PGUSER="$usuario" PGPASSWORD="$senha"
   export PGSSLMODE=require PGCONNECT_TIMEOUT=7
-  if result="$(psql -X -Atq -F '|' -P pager=off -v ON_ERROR_STOP=1 2>/dev/null <<'SQL'
+  if result="$(psql -X -Atq -F '|' -P pager=off -v ON_ERROR_STOP=1 2>&1 <<'SQL'
 BEGIN READ ONLY;
 SET LOCAL statement_timeout = '20s';
 \echo SCHEMA_BEGIN
@@ -197,7 +197,31 @@ SQL
   )"; then
     printf 'DB_BEGIN:%s\n%s\nDB_END:%s\n' "$label" "$result" "$label"
   else
-    printf 'DB_FAIL:%s\n' "$label"
+    case "$result" in
+      *"remaining connection slots"*|*"too many clients"*|*"too many connections"*)
+        motivo=CONNECTION_LIMIT ;;
+      *"password authentication failed"*|*"authentication failed"*)
+        motivo=AUTH_FAILED ;;
+      *"could not translate host name"*|*"Name or service not known"*)
+        motivo=DNS ;;
+      *"timeout expired"*|*"Connection timed out"*|*"Operation timed out"*|*"connection timeout"*)
+        motivo=TIMEOUT ;;
+      *"Connection refused"*|*"connection refused"*)
+        motivo=CONNECTION_REFUSED ;;
+      *"no pg_hba.conf entry"*)
+        motivo=ACCESS_RULE ;;
+      *"server closed the connection unexpectedly"*|*"server closed the connection"*)
+        motivo=SERVER_CLOSED ;;
+      *"permission denied"*)
+        motivo=PERMISSION ;;
+      *"SSL"*|*"ssl"*)
+        motivo=TLS ;;
+      *"does not exist"*)
+        motivo=NOT_FOUND ;;
+      *)
+        motivo=UNKNOWN ;;
+    esac
+    printf 'DB_FAIL:%s:%s\n' "$label" "$motivo"
   fi
   unset PGPASSWORD
 }
@@ -252,8 +276,17 @@ try:
 
     aiven = parse('AIVEN')
     neon = parse('NEON')
-    print('AIVEN:', 'CONECTOU (leitura)' if aiven else 'FALHOU / SEM VAGA')
-    print('NEON:', 'CONECTOU (leitura)' if neon else 'FALHOU')
+    def motivo_falha(label):
+        for linha in output.splitlines():
+            prefixo = 'DB_FAIL:' + label + ':'
+            if linha.startswith(prefixo):
+                return linha[len(prefixo):].strip()
+        return 'INDETERMINADA'
+
+    print('AIVEN:', 'CONECTOU (leitura)' if aiven
+          else 'FALHOU (' + motivo_falha('AIVEN') + ')')
+    print('NEON:', 'CONECTOU (leitura)' if neon
+          else 'FALHOU (' + motivo_falha('NEON') + ')')
     if aiven and neon:
         at, nt = aiven['counts'], neon['counts']
         ac, nc = aiven['columns'], neon['columns']
