@@ -176,7 +176,7 @@ def safe_log_checks(name):
         r"Initialized JPA EntityManagerFactory",
         logs, re.IGNORECASE))
     pool = bool(re.search(
-        r"HikariPool-\\d+.*Start completed", logs, re.IGNORECASE))
+        r"HikariPool-\d+.*Start completed", logs, re.IGNORECASE))
     spring = bool(re.search(
         r"Started [A-Za-z][A-Za-z0-9]*Application in ",
         logs, re.IGNORECASE))
@@ -217,7 +217,7 @@ def safe_log_checks(name):
     # NUNCA imprimir mensagens de exception ou linhas de log:
     # elas podem incluir URLs JDBC e credenciais.
     exception_classes = re.findall(
-        r"Caused by:\\s+([a-zA-Z_$][\\w.$]*(?:Exception|Error))",
+        r"Caused by:\s+([a-zA-Z_$][\w.$]*(?:Exception|Error))",
         logs
     )
     exceptions = []
@@ -226,7 +226,7 @@ def safe_log_checks(name):
         if simple not in exceptions:
             exceptions.append(simple)
     sqlstates = re.findall(
-        r"(?:SQLState|SQLSTATE)\\s*[:=]\\s*([0-9A-Z]{5})",
+        r"(?:SQLState|SQLSTATE)\s*[:=]\s*([0-9A-Z]{5})",
         logs, flags=re.IGNORECASE
     )
     state_list = list(dict.fromkeys(sqlstates))
