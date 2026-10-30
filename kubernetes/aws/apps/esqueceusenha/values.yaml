@@ -15,7 +15,7 @@ configMap:
   data: {}
 
 secret:
-  existingSecret: ""
+  existingSecret: esqueceusenha-neon-secret
 
 service:
   enabled: true
