@@ -4,7 +4,7 @@ fullnameOverride: cadastro-api
 
 image:
   repository: ecociente/ecociente
-  tag: cadastro-1.0.0
+  tag: cadastro-neon-20261030-1
   pullPolicy: IfNotPresent
 
 containerPort: 9090
