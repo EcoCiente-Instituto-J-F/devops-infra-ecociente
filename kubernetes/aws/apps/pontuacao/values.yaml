@@ -7,7 +7,7 @@ image:
   tag: pontuacao-1.0.1
   pullPolicy: IfNotPresent
 
-containerPort: 8080
+containerPort: 9786
 
 configMap:
   enabled: true
@@ -20,7 +20,7 @@ secret:
 service:
   enabled: true
   type: ClusterIP
-  port: 8080
+  port: 9786
 
 ingress:
   enabled: false
