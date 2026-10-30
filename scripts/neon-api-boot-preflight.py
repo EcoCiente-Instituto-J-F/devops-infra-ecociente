@@ -48,15 +48,15 @@ def kubectl_json(args):
 
 def environmental_overrides(container):
     forced = {
-        "SPRING_JPA_HIBERNATE_DDL_AUTO": "validate",
+        "SPRING_JPA_HIBERNATE_DDLAUTO": "validate",
         "SPRING_SQL_INIT_MODE": "never",
         "SPRING_FLYWAY_ENABLED": "false",
         "SPRING_LIQUIBASE_ENABLED": "false",
-        "SPRING_MAIN_LAZY_INITIALIZATION": "false",
-        "SPRING_DATASOURCE_HIKARI_READ_ONLY": "true",
-        "SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE": "1",
-        "SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE": "0",
-        "SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT": "12000",
+        "SPRING_MAIN_LAZYINITIALIZATION": "false",
+        "SPRING_DATASOURCE_HIKARI_READONLY": "true",
+        "SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE": "1",
+        "SPRING_DATASOURCE_HIKARI_MINIMUMIDLE": "0",
+        "SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT": "12000",
     }
     existing = [
         item for item in container.get("env", [])
