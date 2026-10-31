@@ -7,7 +7,7 @@ image:
   tag: esqueceusenha-1.0.1
   pullPolicy: IfNotPresent
 
-containerPort: 9809
+containerPort: 8080
 
 configMap:
   enabled: true
@@ -20,7 +20,7 @@ secret:
 service:
   enabled: true
   type: ClusterIP
-  port: 9809
+  port: 8080
 
 ingress:
   enabled: false
