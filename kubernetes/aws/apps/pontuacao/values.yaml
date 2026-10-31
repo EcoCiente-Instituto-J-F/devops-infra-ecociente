@@ -4,7 +4,7 @@ fullnameOverride: pontuacao-api
 
 image:
   repository: ecociente/ecociente
-  tag: pontuacao-1.0.1
+  tag: pontuacao-1.0.2
   pullPolicy: IfNotPresent
 
 containerPort: 8080
