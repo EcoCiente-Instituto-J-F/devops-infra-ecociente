@@ -4,7 +4,7 @@ fullnameOverride: dad-api
 
 image:
   repository: ecociente/ecociente
-  tag: dad-1.0.0
+  tag: dad-1.0.1
   pullPolicy: IfNotPresent
 
 containerPort: 8080
