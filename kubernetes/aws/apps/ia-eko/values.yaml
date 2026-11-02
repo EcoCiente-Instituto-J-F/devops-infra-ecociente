@@ -4,7 +4,7 @@ fullnameOverride: ia-eko
 
 image:
   repository: ecociente/ecociente
-  tag: ia-eko-1.0.1
+  tag: ia-eko-1.0.2
   pullPolicy: IfNotPresent
 
 containerPort: 8000
@@ -23,6 +23,7 @@ configMap:
 
     LLM_PROVIDER: "mock"
     EMBEDDING_PROVIDER: "mock"
+    AUTH_API_URL: "http://mobile-api-service.ecociente.svc.cluster.local:8080/api/usuarios/me"
 
     KNOWLEDGE_BASE_PATH: "data/FAQ_KNOWLEDGE_BASE.md"
 
