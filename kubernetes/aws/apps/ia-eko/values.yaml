@@ -15,14 +15,16 @@ configMap:
   data:
     APP_NAME: "EcoCiente Eko Chatbot"
     APP_VERSION: "1.9.0"
-    APP_ENV: "development"
+    APP_ENV: "production"
 
     HOST: "0.0.0.0"
     PORT: "8000"
     LOG_LEVEL: "INFO"
 
-    LLM_PROVIDER: "mock"
+    LLM_PROVIDER: "deepseek"
+    DEEPSEEK_MODEL: "deepseek-flash"
     EMBEDDING_PROVIDER: "mock"
+    FAQ_BACKEND: "rag"
     AUTH_API_URL: "http://mobile-api-service.ecociente.svc.cluster.local:8080/api/usuarios/me"
 
     KNOWLEDGE_BASE_PATH: "data/FAQ_KNOWLEDGE_BASE.md"
@@ -35,6 +37,7 @@ configMap:
     SESSION_TTL_SECONDS: "1800"
     MEMORY_MAX_MESSAGES: "20"
     MEMORY_KEEP_RECENT_MESSAGES: "6"
+    LONG_TERM_MEMORY_ENABLED: "false"
 
     JUDGE_MAX_CORRECTIONS: "1"
 
@@ -95,4 +98,5 @@ resources:
     cpu: "1"
     memory: 1Gi
 
-podLabels: {}
+podLabels:
+  eko-configuration-revision: "deepseek-flash-v1"
