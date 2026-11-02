@@ -12,10 +12,11 @@ containerPort: 8080
 configMap:
   enabled: true
   nameOverride: dad-config
-  data: {}
+  data:
+    CORS_ORIGINS: "https://ecociente-instituto-j-f.github.io,http://localhost:5173"
 
 secret:
-  existingSecret: ""
+  existingSecret: dad-secret
 
 service:
   enabled: true
@@ -23,16 +24,16 @@ service:
   port: 8080
 
 ingress:
-  enabled: false
+  enabled: true
   className: traefik
-  host: ""
-  path: /
+  host: "api.52.71.117.143.sslip.io"
+  path: /api/admin/v1
   pathType: Prefix
   annotations: {}
 
   tls:
-    enabled: false
-    secretName: ""
+    enabled: true
+    secretName: ecociente-api-tls
 
 probes:
   startup:
