@@ -32,16 +32,16 @@ service:
   port: 8080
 
 ingress:
-  enabled: false
+  enabled: true
   className: traefik
-  host: ""
+  host: "mobile.52.71.117.143.sslip.io"
   path: /
   pathType: Prefix
   annotations: {}
 
   tls:
-    enabled: false
-    secretName: ""
+    enabled: true
+    secretName: "ecociente-mobile-tls"
 
 probes:
   startup:
