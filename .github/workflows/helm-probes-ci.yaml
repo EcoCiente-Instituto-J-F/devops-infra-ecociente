@@ -1,0 +1,94 @@
+name: Helm - validar probes opcionais
+
+on:
+  pull_request:
+    paths:
+      - "kubernetes/aws/charts/ecociente-api/**"
+      - "kubernetes/aws/apps/**/values.yaml"
+      - ".github/workflows/helm-probes-ci.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  render-and-lint:
+    name: Lint e renderizacao HTTP/TCP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Baixar codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.3.0
+
+      - name: Validar chart e compatibilidade dos aplicativos
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHART="kubernetes/aws/charts/ecociente-api"
+          for values in kubernetes/aws/apps/*/values.yaml; do
+            helm lint "$CHART" -f "$values"
+          done
+
+      - name: Conferir renderizacao e isolamento do comportamento HTTP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          import subprocess
+
+          chart = "kubernetes/aws/charts/ecociente-api"
+
+          def render(values, *overrides):
+              cmd = [
+                  "helm", "template", "audit",
+                  chart, "-f", values,
+                  "--show-only", "templates/deployment.yaml"
+              ] + list(overrides)
+              p = subprocess.run(
+                  cmd, text=True, capture_output=True, check=True
+              )
+              return p.stdout
+
+          def probe_kind(rendered, name, kind):
+              pattern = (
+                  r"(?m)^\s+" + re.escape(name) +
+                  r"Probe:\s*\n\s+" + re.escape(kind) + r":"
+              )
+              assert re.search(pattern, rendered), (
+                  name, kind, "probe nao renderizada como esperado"
+              )
+
+          def http_path(rendered, name, path):
+              pattern = (
+                  r"(?m)^\s+" + re.escape(name) +
+                  r"Probe:\s*\n\s+httpGet:\s*\n\s+path:\s*" +
+                  re.escape('"' + path + '"')
+              )
+              assert re.search(pattern, rendered), (
+                  name, path, "caminho HTTP inesperado"
+              )
+
+          for app in ("mobile", "pontuacao", "calendario"):
+              values = f"kubernetes/aws/apps/{app}/values.yaml"
+              out = render(values)
+              for name in ("startup", "readiness", "liveness"):
+                  probe_kind(out, name, "tcpSocket")
+              print(f"PADRAO_TCP_PRESERVADO: {app}")
+
+          mobile = "kubernetes/aws/apps/mobile/values.yaml"
+          out = render(
+              mobile,
+              "--set-string", "probes.startup.httpGetPath=/livez",
+              "--set-string", "probes.readiness.httpGetPath=/readyz",
+              "--set-string", "probes.liveness.httpGetPath=/livez",
+          )
+          http_path(out, "startup", "/livez")
+          http_path(out, "readiness", "/readyz")
+          http_path(out, "liveness", "/livez")
+          print("OVERRIDE_HTTP_MOBILE_VALIDADO: True")
+          PY

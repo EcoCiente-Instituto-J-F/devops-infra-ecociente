@@ -54,8 +54,14 @@ spec:
 
           {{- if .Values.probes.startup.enabled }}
           startupProbe:
+            {{- if .Values.probes.startup.httpGetPath }}
+            httpGet:
+              path: {{ .Values.probes.startup.httpGetPath | quote }}
+              port: http
+            {{- else }}
             tcpSocket:
               port: http
+            {{- end }}
             periodSeconds: {{ .Values.probes.startup.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.startup.failureThreshold }}
@@ -63,8 +69,14 @@ spec:
 
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
+            {{- if .Values.probes.readiness.httpGetPath }}
+            httpGet:
+              path: {{ .Values.probes.readiness.httpGetPath | quote }}
+              port: http
+            {{- else }}
             tcpSocket:
               port: http
+            {{- end }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
@@ -72,8 +84,14 @@ spec:
 
           {{- if .Values.probes.liveness.enabled }}
           livenessProbe:
+            {{- if .Values.probes.liveness.httpGetPath }}
+            httpGet:
+              path: {{ .Values.probes.liveness.httpGetPath | quote }}
+              port: http
+            {{- else }}
             tcpSocket:
               port: http
+            {{- end }}
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
             timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
             failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
