@@ -17,7 +17,7 @@ configMap:
     SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
 
 secret:
-  existingSecret: calendario-secret
+  existingSecret: calendario-neon-secret
 
 service:
   enabled: true

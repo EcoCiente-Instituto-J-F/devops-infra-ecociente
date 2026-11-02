@@ -17,7 +17,7 @@ configMap:
     JWT_EXPIRATION_MS: "300000"
 
 secret:
-  existingSecret: autenticacao-secret
+  existingSecret: autenticacao-neon-secret
 
 service:
   enabled: true

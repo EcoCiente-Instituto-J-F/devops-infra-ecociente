@@ -21,7 +21,7 @@ configMap:
 secret:
   # Provisionar no Kubernetes antes do merge; nao versionar os valores.
   # Chaves: DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET.
-  existingSecret: mobile-secret
+  existingSecret: mobile-neon-secret
 
 service:
   enabled: true
