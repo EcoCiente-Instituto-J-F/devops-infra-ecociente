@@ -4,7 +4,7 @@ fullnameOverride: mobile-api
 
 image:
   repository: ecociente/ecociente
-  tag: mobile-1.0.1
+  tag: mobile-1.1.5
   pullPolicy: IfNotPresent
 
 containerPort: 8080
@@ -14,14 +14,17 @@ configMap:
   nameOverride: mobile-config
   data:
     SERVER_PORT: "8080"
-    SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
-    SPRING_DATASOURCE_HIKARI_MINIMUMIDLE: "1"
-    SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT: "10000"
+    APP_JOBS_ENABLED: "false"
+    APP_PUSH_ENABLED: "false"
+    VALIDADOR_ATIVO: "false"
+    SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+    SPRING_SQL_INIT_MODE: "never"
+    SPRING_FLYWAY_ENABLED: "false"
+    SPRING_LIQUIBASE_ENABLED: "false"
 
 secret:
-  # Provisionar no Kubernetes antes do merge; nao versionar os valores.
-  # Chaves: DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET.
-  existingSecret: mobile-secret
+  # Secret existente no cluster; nunca armazenar seus valores no Git.
+  existingSecret: mobile-neon-secret
 
 service:
   enabled: true
@@ -45,7 +48,7 @@ probes:
     enabled: true
     periodSeconds: 5
     timeoutSeconds: 2
-    failureThreshold: 30
+    failureThreshold: 90
 
   readiness:
     enabled: true
@@ -62,10 +65,10 @@ probes:
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 384Mi
 
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 800m
+    memory: 1Gi
 
 podLabels: {}
