@@ -4,7 +4,7 @@ fullnameOverride: autenticacao-api
 
 image:
   repository: ecociente/ecociente
-  tag: autenticacao-1.0.1
+  tag: autenticacao-1.0.2
   pullPolicy: IfNotPresent
 
 containerPort: 9801
@@ -17,7 +17,7 @@ configMap:
     JWT_EXPIRATION_MS: "300000"
 
 secret:
-  existingSecret: autenticacao-secret
+  existingSecret: autenticacao-neon-secret
 
 service:
   enabled: true
@@ -30,7 +30,8 @@ ingress:
   host: "api.52.71.117.143.sslip.io"
   path: /auth
   pathType: Prefix
-  annotations: {}
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: ecociente-autenticacao-pages-cors@kubernetescrd
 
   tls:
     enabled: true
@@ -63,3 +64,16 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
+
+corsMiddleware:
+  enabled: true
+  name: autenticacao-pages-cors
+  allowOrigins:
+    - https://ecociente-instituto-j-f.github.io
+  allowMethods:
+    - OPTIONS
+    - POST
+  allowHeaders:
+    - Content-Type
+    - Accept
+  maxAge: 3600
