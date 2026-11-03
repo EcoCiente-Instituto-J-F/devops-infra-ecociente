@@ -1,0 +1,19 @@
+{{- if .Values.corsMiddleware.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ required "corsMiddleware.name obrigatorio" .Values.corsMiddleware.name | quote }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ecociente-api.labels" . | nindent 4 }}
+spec:
+  headers:
+    accessControlAllowOriginList:
+      {{- toYaml .Values.corsMiddleware.allowOrigins | nindent 6 }}
+    accessControlAllowMethods:
+      {{- toYaml .Values.corsMiddleware.allowMethods | nindent 6 }}
+    accessControlAllowHeaders:
+      {{- toYaml .Values.corsMiddleware.allowHeaders | nindent 6 }}
+    accessControlMaxAge: {{ .Values.corsMiddleware.maxAge }}
+    addVaryHeader: true
+{{- end }}
