@@ -67,3 +67,12 @@ resources:
     memory: 512Mi
 
 podLabels: {}
+
+# Middleware Traefik opcional. Desativado para todas as APIs por padrao.
+corsMiddleware:
+  enabled: false
+  name: ""
+  allowOrigins: []
+  allowMethods: []
+  allowHeaders: []
+  maxAge: 3600
