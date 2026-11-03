@@ -16,6 +16,8 @@ configMap:
     SERVER_PORT: "8080"
     APP_JOBS_ENABLED: "false"
     APP_PUSH_ENABLED: "false"
+    APP_PUSH_AUDIENCE: "pilot"
+    APP_PUSH_PILOT_USER_IDS: "63"
     VALIDADOR_ATIVO: "false"
     SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
     SPRING_SQL_INIT_MODE: "never"
