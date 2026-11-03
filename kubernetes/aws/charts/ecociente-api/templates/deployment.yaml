@@ -21,6 +21,10 @@ spec:
 
   template:
     metadata:
+      {{- if and .Values.configMap.enabled .Values.configMap.data }}
+      annotations:
+        checksum/config: {{ .Values.configMap.data | toJson | sha256sum | quote }}
+      {{- end }}
       labels:
         {{- include "ecociente-api.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
