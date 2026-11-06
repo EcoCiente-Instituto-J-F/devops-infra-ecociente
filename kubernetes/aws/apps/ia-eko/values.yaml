@@ -25,9 +25,13 @@ configMap:
     DEEPSEEK_MODEL: "deepseek-flash"
     EMBEDDING_PROVIDER: "mock"
     FAQ_BACKEND: "rag"
+    QDRANT_COLLECTION: "faq"
+    QDRANT_EMBEDDING_MODEL: "intfloat/multilingual-e5-large"
     AUTH_API_URL: "http://mobile-api-service.ecociente.svc.cluster.local:8080/api/usuarios/me"
+    CALENDAR_API_BASE_URL: "http://mobile-api-service.ecociente.svc.cluster.local:8080"
 
     KNOWLEDGE_BASE_PATH: "data/FAQ_KNOWLEDGE_BASE.md"
+    EDUCATIONAL_BASE_PATH: "data/EDUCACIONAL_RECICLAGEM.md"
 
     ENABLE_EXTERNAL_SOURCE: "false"
 
